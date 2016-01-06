@@ -11,45 +11,49 @@
 typedef int crypto_hash_sha512_state;
 typedef int ge_p3;
 
-void crypto_hash_sha512(char *az, char *sk, unsigned long length);
-    //@ requires true;
-    //@ ensures true;
+void crypto_hash_sha512(char *out, char *in, unsigned long inlen);
+    //@ requires out[..64] |-> _ &*& in[..inlen] |-> _;
+    //@ ensures out[..64] |-> _ &*& in[..inlen] |-> _;
+
+//@ predicate crypto_hash_sha512_state(crypto_hash_sha512_state *state) = integer(state, _);
 
 void crypto_hash_sha512_init(crypto_hash_sha512_state *hs);
-    //@ requires true;
-    //@ ensures true;
+    //@ requires integer((void *)hs, _);
+    //@ ensures crypto_hash_sha512_state(hs);
 
-void crypto_hash_sha512_update(crypto_hash_sha512_state *hs, char *az, unsigned long length);
-    //@ requires true;
-    //@ ensures true;
+void crypto_hash_sha512_update(crypto_hash_sha512_state *hs, char *in, unsigned long inlen);
+    //@ requires crypto_hash_sha512_state(hs) &*& in[..inlen] |-> _;
+    //@ ensures crypto_hash_sha512_state(hs) &*& in[..inlen] |-> _;
 
-void crypto_hash_sha512_final(crypto_hash_sha512_state *hs, char *nonce);
-    //@ requires true;
-    //@ ensures true;
+void crypto_hash_sha512_final(crypto_hash_sha512_state *hs, char *out);
+    //@ requires crypto_hash_sha512_state(hs) &*& out[..64] |-> _;
+    //@ ensures integer((void *)hs, _) &*& out[..64] |-> _;
 
-void memmove(void *to, void *from, unsigned long size);
-    //@ requires true;
-    //@ ensures true;
+void memmove(char *to, char *from, unsigned long size);
+    //@ requires to[..size] |-> _ &*& from[..size] |-> ?cs;
+    //@ ensures to[..size] |-> cs &*& from[..size] |-> cs;
 
-void sc_reduce(char *nonce);
-    //@ requires true;
-    //@ ensures true;
+void sc_reduce(char *buf);
+    //@ requires buf[..64] |-> _;
+    //@ ensures buf[..64] |-> _;
 
-void ge_scalarmult_base(ge_p3 *R, char *nonce);
-    //@ requires true;
-    //@ ensures true;
+//@ predicate ge_p3(ge_p3 *p;) = integer(p, _);
+
+void ge_scalarmult_base(ge_p3 *R, char *buf);
+    //@ requires ge_p3(R) &*& buf[..64] |-> _;
+    //@ ensures ge_p3(R) &*& buf[..64] |-> _;
 
 void ge_p3_tobytes(char *sig, ge_p3 *R);
-    //@ requires true;
-    //@ ensures true;
+    //@ requires sig[..64] |-> _ &*& ge_p3(R);
+    //@ ensures sig[..64] |-> _ &*& ge_p3(R);
 
 void sc_muladd(char *sig, char *hram, char *az, char *nonce);
-    //@ requires true;
-    //@ ensures true;
+    //@ requires sig[..32] |-> _ &*& hram[..64] |-> _ &*& az[..64] |-> _ &*& nonce[..64] |-> _;
+    //@ ensures sig[..32] |-> _ &*& hram[..64] |-> _ &*& az[..64] |-> _ &*& nonce[..64] |-> _;
 
 void sodium_memzero(char *buf, unsigned long size);
-    //@ requires true;
-    //@ ensures true;
+    //@ requires buf[..size] |-> _;
+    //@ ensures buf[..size] |-> _;
 
 //@ predicate integer_opt(int *p;) = p == 0 ? true : integer(p, _);
 
@@ -57,8 +61,8 @@ int
 crypto_sign_ed25519_detached(char *sig, /*unsigned long long*/ int *siglen_p,
                              /*const*/ char *m, unsigned /*long*/ long mlen,
                              /*const*/ char *sk)
-    //@ requires integer_opt(siglen_p);
-    //@ ensures siglen_p == 0 ? true : integer(siglen_p, 64);
+    //@ requires sig[..64] |-> _ &*& integer_opt(siglen_p) &*& m[..mlen] |-> _ &*& sk[..64] |-> _;
+    //@ ensures sig[..64] |-> _ &*& m[..mlen] |-> _ &*& sk[..64] |-> _ &*& siglen_p == 0 ? true : integer(siglen_p, 64);
 {
     crypto_hash_sha512_state hs;
     char az[64];
@@ -72,10 +76,13 @@ crypto_sign_ed25519_detached(char *sig, /*unsigned long long*/ int *siglen_p,
     az[31] = (char)(az[31] | 64);
 
     crypto_hash_sha512_init(&hs);
+    //@ chars_split(az, 32);
     crypto_hash_sha512_update(&hs, (char *)az + 32, 32);
     crypto_hash_sha512_update(&hs, m, mlen);
     crypto_hash_sha512_final(&hs, nonce);
 
+    //@ chars_split(sig, 32);
+    //@ chars_split(sk, 32);
     memmove(sig + 32, sk + 32, 32);
 
     sc_reduce(nonce);
@@ -88,6 +95,7 @@ crypto_sign_ed25519_detached(char *sig, /*unsigned long long*/ int *siglen_p,
     crypto_hash_sha512_final(&hs, hram);
 
     sc_reduce(hram);
+    //@ chars_split(sig, 32);
     sc_muladd(sig + 32, hram, az, nonce);
 
     sodium_memzero(az, 64);
