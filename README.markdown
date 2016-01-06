@@ -10,7 +10,7 @@ In particular, I inserted a specification (precondition and postcondition) for f
 (I did not insert a specification for the other function in this file, `crypto_sign_ed25519`, so this function is ignored by VeriFast.)
 I also inserted prototypes, with specifications, of the functions called by `crypto_sign_ed25519_detached`.
 
-To get VeriFast's partial C frontend to successfully parse and typecheck the file, I performed some transformations. For example, I commented out all `#include` directives,
+To get VeriFast's highly incomplete C frontend to successfully parse and typecheck the file, I performed some transformations. For example, I commented out all `#include` directives,
 I replaced `unsigned char` by `char`, `unsigned long long` by `unsigned int`, etc.
 
 So, at this point, this is far from being any kind of evidence about the original libsodium code. Work in progress.
