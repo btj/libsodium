@@ -6,12 +6,27 @@
 //#include "utils.h"
 //#include "../../../crypto_core/curve25519/ref10/curve25519_ref10.h"
 
+/*@
+
+lemma_auto void uchars_split(unsigned char *array, int offset);
+   requires [?f]uchars(array, ?n, ?cs) &*& 0 <= offset &*& offset <= n;
+   ensures
+       [f]uchars(array, offset, take(offset, cs))
+       &*& [f]uchars(array + offset, n - offset, drop(offset, cs))
+       &*& append(take(offset, cs), drop(offset, cs)) == cs;
+
+lemma_auto void uchars_join(unsigned char *array);
+    requires [?f]uchars(array, ?n, ?cs) &*& [f]uchars(array + n, ?n0, ?cs0);
+    ensures [f]uchars(array, n + n0, append(cs, cs0));
+
+@*/
+
 #define NULL 0
 
 typedef int crypto_hash_sha512_state;
 typedef int ge_p3;
 
-void crypto_hash_sha512(char *out, char *in, unsigned long inlen);
+void crypto_hash_sha512(unsigned char *out, unsigned char *in, unsigned long inlen);
     //@ requires out[..64] |-> _ &*& in[..inlen] |-> _;
     //@ ensures out[..64] |-> _ &*& in[..inlen] |-> _;
 
@@ -21,68 +36,68 @@ void crypto_hash_sha512_init(crypto_hash_sha512_state *hs);
     //@ requires integer((void *)hs, _);
     //@ ensures crypto_hash_sha512_state(hs);
 
-void crypto_hash_sha512_update(crypto_hash_sha512_state *hs, char *in, unsigned long inlen);
+void crypto_hash_sha512_update(crypto_hash_sha512_state *hs, unsigned char *in, unsigned long inlen);
     //@ requires crypto_hash_sha512_state(hs) &*& in[..inlen] |-> _;
     //@ ensures crypto_hash_sha512_state(hs) &*& in[..inlen] |-> _;
 
-void crypto_hash_sha512_final(crypto_hash_sha512_state *hs, char *out);
+void crypto_hash_sha512_final(crypto_hash_sha512_state *hs, unsigned char *out);
     //@ requires crypto_hash_sha512_state(hs) &*& out[..64] |-> _;
     //@ ensures integer((void *)hs, _) &*& out[..64] |-> _;
 
-void memmove(char *to, char *from, unsigned long size);
+void memmove(unsigned char *to, unsigned char *from, unsigned long size);
     //@ requires to[..size] |-> _ &*& from[..size] |-> ?cs;
     //@ ensures to[..size] |-> cs &*& from[..size] |-> cs;
 
-void sc_reduce(char *buf);
+void sc_reduce(unsigned char *buf);
     //@ requires buf[..64] |-> _;
     //@ ensures buf[..64] |-> _;
 
 //@ predicate ge_p3(ge_p3 *p;) = integer(p, _);
 
-void ge_scalarmult_base(ge_p3 *R, char *buf);
+void ge_scalarmult_base(ge_p3 *R, unsigned char *buf);
     //@ requires ge_p3(R) &*& buf[..64] |-> _;
     //@ ensures ge_p3(R) &*& buf[..64] |-> _;
 
-void ge_p3_tobytes(char *sig, ge_p3 *R);
+void ge_p3_tobytes(unsigned char *sig, ge_p3 *R);
     //@ requires sig[..64] |-> _ &*& ge_p3(R);
     //@ ensures sig[..64] |-> _ &*& ge_p3(R);
 
-void sc_muladd(char *sig, char *hram, char *az, char *nonce);
+void sc_muladd(unsigned char *sig, unsigned char *hram, unsigned char *az, unsigned char *nonce);
     //@ requires sig[..32] |-> _ &*& hram[..64] |-> _ &*& az[..64] |-> _ &*& nonce[..64] |-> _;
     //@ ensures sig[..32] |-> _ &*& hram[..64] |-> _ &*& az[..64] |-> _ &*& nonce[..64] |-> _;
 
-void sodium_memzero(char *buf, unsigned long size);
+void sodium_memzero(unsigned char *buf, unsigned long size);
     //@ requires buf[..size] |-> _;
     //@ ensures buf[..size] |-> _;
 
 //@ predicate integer_opt(int *p;) = p == 0 ? true : integer(p, _);
 
 int
-crypto_sign_ed25519_detached(char *sig, /*unsigned long long*/ int *siglen_p,
-                             /*const*/ char *m, unsigned /*long*/ long mlen,
-                             /*const*/ char *sk)
+crypto_sign_ed25519_detached(unsigned char *sig, /*unsigned long long*/ int *siglen_p,
+                             /*const*/ unsigned char *m, unsigned /*long*/ long mlen,
+                             /*const*/ unsigned char *sk)
     //@ requires sig[..64] |-> _ &*& integer_opt(siglen_p) &*& m[..mlen] |-> _ &*& sk[..64] |-> _;
     //@ ensures sig[..64] |-> _ &*& m[..mlen] |-> _ &*& sk[..64] |-> _ &*& siglen_p == 0 ? true : integer(siglen_p, 64);
 {
     crypto_hash_sha512_state hs;
-    char az[64];
-    char nonce[64];
-    char hram[64];
+    unsigned char az[64];
+    unsigned char nonce[64];
+    unsigned char hram[64];
     ge_p3 R;
 
     crypto_hash_sha512(az, sk, 32);
-    az[0] = (char)(az[0] & 248);
-    az[31] = (char)(az[31] & 63);
-    az[31] = (char)(az[31] | 64);
+    az[0] = (unsigned char)((int)az[0] & 248);
+    az[31] = (unsigned char)((int)az[31] & 63);
+    az[31] = (unsigned char)((int)az[31] | 64);
 
     crypto_hash_sha512_init(&hs);
-    //@ chars_split(az, 32);
-    crypto_hash_sha512_update(&hs, (char *)az + 32, 32);
+    //@ uchars_split(az, 32);
+    crypto_hash_sha512_update(&hs, (unsigned char *)az + 32, 32);
     crypto_hash_sha512_update(&hs, m, mlen);
     crypto_hash_sha512_final(&hs, nonce);
 
-    //@ chars_split(sig, 32);
-    //@ chars_split(sk, 32);
+    //@ uchars_split(sig, 32);
+    //@ uchars_split(sk, 32);
     memmove(sig + 32, sk + 32, 32);
 
     sc_reduce(nonce);
@@ -95,7 +110,7 @@ crypto_sign_ed25519_detached(char *sig, /*unsigned long long*/ int *siglen_p,
     crypto_hash_sha512_final(&hs, hram);
 
     sc_reduce(hram);
-    //@ chars_split(sig, 32);
+    //@ uchars_split(sig, 32);
     sc_muladd(sig + 32, hram, az, nonce);
 
     sodium_memzero(az, 64);
