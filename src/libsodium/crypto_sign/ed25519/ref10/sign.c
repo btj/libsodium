@@ -19,6 +19,10 @@ lemma_auto void uchars_join(unsigned char *array);
     requires [?f]uchars(array, ?n, ?cs) &*& [f]uchars(array + n, ?n0, ?cs0);
     ensures [f]uchars(array, n + n0, append(cs, cs0));
 
+lemma void uchars_limits(unsigned char *array);
+    requires [?f]uchars(array, ?n, ?cs) &*& true == ((unsigned char *)0 <= array) &*& array <= (unsigned char *)UINTPTR_MAX;
+    ensures [f]uchars(array, n, cs) &*& true == ((unsigned char *)0 <= array) &*& array + n <= (unsigned char *)UINTPTR_MAX;
+
 @*/
 
 #define NULL 0
@@ -86,9 +90,13 @@ crypto_sign_ed25519_detached(unsigned char *sig, /*unsigned long long*/ int *sig
     ge_p3 R;
 
     crypto_hash_sha512(az, sk, 32);
-    az[0] = (unsigned char)((int)az[0] & 248);
-    az[31] = (unsigned char)((int)az[31] & 63);
-    az[31] = (unsigned char)((int)az[31] | 64);
+    unsigned char az0 = az[0];
+    //@ produce_limits(az0);
+    unsigned char az31 = az[31];
+    //@ produce_limits(az31);
+    az[0] = (unsigned char)((int)az0 & 248);
+    az[31] = (unsigned char)((int)az31 & 63);
+    az[31] = (unsigned char)((int)az31 | 64);
 
     crypto_hash_sha512_init(&hs);
     //@ uchars_split(az, 32);
@@ -98,6 +106,8 @@ crypto_sign_ed25519_detached(unsigned char *sig, /*unsigned long long*/ int *sig
 
     //@ uchars_split(sig, 32);
     //@ uchars_split(sk, 32);
+    //@ uchars_limits(sig);
+    //@ uchars_limits(sk);
     memmove(sig + 32, sk + 32, 32);
 
     sc_reduce(nonce);
